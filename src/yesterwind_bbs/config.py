@@ -22,6 +22,7 @@ def _default(key: str, default: str) -> str:
 
 
 DATABASE_URL: str = _default("DATABASE_URL", "sqlite+aiosqlite:///data/bbs.db")
+FILES_DIR: str = _default("FILES_DIR", "data/files")
 
 BBS_NAME: str = _default("BBS_NAME", "Yesterwind BBS")
 BBS_SYSOP: str = _default("BBS_SYSOP", "Sysop")
