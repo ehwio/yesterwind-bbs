@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yesterwind-bbs"
+version = "0.1.0"
+description = "Retro-style telnet BBS with ANSI/ATASCII/PETSCII/Amiga support"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Eric Williams", email = "eric@subcritical.org" }]
+keywords = ["bbs", "telnet", "ansi", "retro", "atascii", "petscii"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: No Input/Output (Daemon)",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: BBS",
+]
+
+dependencies = [
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "passlib[bcrypt]>=1.7",
+    "python-dotenv>=1.0",
+    "rich>=13.7",
+    "yesterwind-xyzmodem>=0.1.0",
+]
+
+[project.optional-dependencies]
+postgres = ["asyncpg>=0.29"]
+mysql    = ["aiomysql>=0.2"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+bbs      = "yesterwind_bbs.cli:main"
+bbs-sysop = "yesterwind_bbs.sysop.console:main"
+
+[project.urls]
+Homepage   = "https://github.com/ehwio/yesterwind-bbs"
+Repository = "https://github.com/ehwio/yesterwind-bbs"
+Issues     = "https://github.com/ehwio/yesterwind-bbs/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yesterwind_bbs"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths    = ["tests"]
+addopts      = "--cov=yesterwind_bbs --cov-report=term-missing --cov-fail-under=50"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "SIM", "I"]

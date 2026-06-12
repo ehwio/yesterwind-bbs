@@ -1,0 +1,14 @@
+services:
+  bbs:
+    build: .
+    image: yesterwind-bbs
+    ports:
+      - "23:23"
+    volumes:
+      - bbs-data:/app/data
+    env_file:
+      - .env          # never committed; copy from .env.example
+    restart: unless-stopped
+
+volumes:
+  bbs-data:
