@@ -73,8 +73,8 @@ _TERMINAL_MAP: dict[TerminalType, type[Terminal]] = {
     TerminalType.ASCII: AsciiTerminal,
 }
 
-_MENU_TIMEOUT = 120.0   # seconds waiting for a menu keypress
-_LOGIN_TIMEOUT = 60.0   # seconds for username/password entry
+_MENU_TIMEOUT = 120.0  # seconds waiting for a menu keypress
+_LOGIN_TIMEOUT = 60.0  # seconds for username/password entry
 _MAX_LOGIN_ATTEMPTS = 3
 
 
@@ -166,6 +166,7 @@ async def _create_session_row(remote_addr: str, terminal_name: str) -> int:
 
 async def _update_session_user(session_id: int, user_id: int) -> None:
     from sqlalchemy import select
+
     async with get_session() as session:
         result = await session.execute(select(BbsSession).where(BbsSession.id == session_id))
         row = result.scalar_one_or_none()
@@ -175,6 +176,7 @@ async def _update_session_user(session_id: int, user_id: int) -> None:
 
 async def _close_session_row(session_id: int) -> None:
     from sqlalchemy import select
+
     async with get_session() as session:
         result = await session.execute(select(BbsSession).where(BbsSession.id == session_id))
         row = result.scalar_one_or_none()
@@ -184,6 +186,7 @@ async def _close_session_row(session_id: int) -> None:
 
 async def _touch_session(session_id: int) -> None:
     from sqlalchemy import select
+
     async with get_session() as session:
         result = await session.execute(select(BbsSession).where(BbsSession.id == session_id))
         row = result.scalar_one_or_none()
@@ -343,9 +346,7 @@ async def _signup_screen(conn: _Conn) -> User | None:
 
     try:
         async with get_session() as session:
-            user = await signup(
-                session, username, password, real_name=real_name, location=location
-            )
+            user = await signup(session, username, password, real_name=real_name, location=location)
     except AuthError as exc:
         await conn.sendline(str(exc))
         return None
@@ -529,9 +530,7 @@ async def _write_message(
 
     try:
         async with get_session() as session:
-            await post_message(
-                session, board_id, subject, body, user, reply_to_id=reply_to_id
-            )
+            await post_message(session, board_id, subject, body, user, reply_to_id=reply_to_id)
         await conn.sendline("Message posted.")
     except MessageError as exc:
         await conn.sendline(str(exc))

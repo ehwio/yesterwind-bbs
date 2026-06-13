@@ -42,7 +42,14 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     """Create all tables if they don't exist. Safe to call on every startup."""
+    from pathlib import Path
+
     from yesterwind_bbs.db.models import Base
+
+    if "sqlite" in config.DATABASE_URL:
+        # Extract path after the triple-slash (four slashes = absolute path)
+        db_path = config.DATABASE_URL.split("///")[-1]
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

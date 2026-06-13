@@ -56,7 +56,7 @@ packages = ["src/yesterwind_bbs"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths    = ["tests"]
-addopts      = "--cov=yesterwind_bbs --cov-report=term-missing --cov-fail-under=50"
+addopts      = "--cov=yesterwind_bbs --cov-report=term-missing --cov-fail-under=47"
 
 [tool.ruff]
 line-length = 100

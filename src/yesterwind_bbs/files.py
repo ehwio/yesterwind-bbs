@@ -305,9 +305,7 @@ async def register_file(
         )
     )
     if dup.scalar_one_or_none() is not None:
-        raise DuplicateFilename(
-            f"A file named '{display_name}' already exists in this area."
-        )
+        raise DuplicateFilename(f"A file named '{display_name}' already exists in this area.")
 
     stored = _stored_name(display_name)
     dest = _area_dir(area) / stored
@@ -357,9 +355,7 @@ async def delete_file(
     await session.flush()
 
     if remove_from_disk:
-        area_result = await session.execute(
-            select(FileArea).where(FileArea.id == entry.area_id)
-        )
+        area_result = await session.execute(select(FileArea).where(FileArea.id == entry.area_id))
         area = area_result.scalar_one_or_none()
         if area is not None:
             path = _area_dir(area) / entry.stored_name
@@ -386,9 +382,7 @@ async def read_file_bytes(
     """
     entry = await get_file(session, file_id, actor)
 
-    area_result = await session.execute(
-        select(FileArea).where(FileArea.id == entry.area_id)
-    )
+    area_result = await session.execute(select(FileArea).where(FileArea.id == entry.area_id))
     area = area_result.scalar_one()
     path = _area_dir(area) / entry.stored_name
 
@@ -517,7 +511,5 @@ async def file_count(
     conditions = [FileEntry.area_id == area_id]
     if not include_inactive:
         conditions.append(FileEntry.is_active == True)  # noqa: E712
-    result = await session.execute(
-        select(func.count()).select_from(FileEntry).where(*conditions)
-    )
+    result = await session.execute(select(func.count()).select_from(FileEntry).where(*conditions))
     return result.scalar_one()

@@ -7,12 +7,14 @@ import logging
 import signal
 
 from yesterwind_bbs import config
+from yesterwind_bbs.db.engine import init_db
 from yesterwind_bbs.session import handle_session
 
 log = logging.getLogger(__name__)
 
 
 async def serve() -> None:
+    await init_db()
     server = await asyncio.start_server(
         handle_session,
         host="0.0.0.0",
