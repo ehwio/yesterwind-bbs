@@ -3,12 +3,20 @@ services:
     build: .
     image: yesterwind-bbs
     ports:
-      - "23:23"
+      - "${BBS_PORT:-23}:23"
     volumes:
       - bbs-data:/app/data
     env_file:
-      - .env          # never committed; copy from .env.example
+      - .env          # copy from .env.example, never commit
     restart: unless-stopped
+    healthcheck:
+      # TCP connect on port 23 — no bytes sent, just checks the port is up
+      test: ["CMD", "python3", "-c",
+             "import socket,sys; s=socket.socket(); s.settimeout(2); sys.exit(s.connect_ex(('localhost',23)))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   bbs-data:
