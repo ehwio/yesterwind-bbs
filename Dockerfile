@@ -9,7 +9,8 @@ WORKDIR /app
 RUN useradd --system --create-home --home-dir /home/bbs --shell /bin/false bbs
 
 # ── Dependency layer (cached unless pyproject.toml or uv.lock changes) ────────
-COPY pyproject.toml uv.lock ./
+# README.md must be present because hatchling validates it during `uv sync`
+COPY pyproject.toml uv.lock README.md ./
 # Install deps only (no project yet) so this layer is reused on source-only changes
 RUN uv sync --frozen --no-install-project --no-dev --extra postgres
 
@@ -26,7 +27,8 @@ EXPOSE 23
 # Default env — override via .env / environment: in docker-compose
 ENV DATABASE_URL=sqlite+aiosqlite:////app/data/bbs.db \
     FILES_DIR=/app/data/files \
-    BBS_PORT=23
+    BBS_PORT=23 \
+    PATH="/app/.venv/bin:$PATH"
 
 USER bbs
 

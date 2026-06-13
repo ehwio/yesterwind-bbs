@@ -334,15 +334,19 @@ class TestSessionModel:
 
 class TestInitDb:
     async def test_init_db_creates_tables(self):
-        """init_db should run without error against a fresh in-memory DB."""
-        import os
+        """init_db creates all tables when called with an isolated in-memory engine."""
+        import sys
+        from unittest.mock import patch
 
-        os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+        from sqlalchemy.ext.asyncio import create_async_engine
 
-        # Re-import to use the in-memory URL
-        from yesterwind_bbs.db.engine import init_db
-
-        await init_db()  # should not raise
+        engine_module = sys.modules["yesterwind_bbs.db.engine"]
+        mem_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        try:
+            with patch.object(engine_module, "engine", mem_engine):
+                await engine_module.init_db()
+        finally:
+            await mem_engine.dispose()
 
     async def test_init_db_creates_sqlite_directory(self, tmp_path):
         """init_db auto-creates the parent directory for a file-backed SQLite DB."""
@@ -357,7 +361,6 @@ class TestInitDb:
 
         assert not db_dir.exists()
 
-        # Access the actual module (not the re-exported engine object from db/__init__)
         engine_module = sys.modules["yesterwind_bbs.db.engine"]
         new_engine = create_async_engine(url, connect_args={"check_same_thread": False})
         try:
