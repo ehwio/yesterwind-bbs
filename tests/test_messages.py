@@ -275,9 +275,7 @@ class TestPostMessage:
         parent.is_deleted = True
         await db_session.commit()
         with pytest.raises(MessageNotFound):
-            await post_message(
-                db_session, board.id, "Re", "Reply", user, reply_to_id=parent.id
-            )
+            await post_message(db_session, board.id, "Re", "Reply", user, reply_to_id=parent.id)
 
     async def test_reply_to_wrong_board_raises(self, db_session, sysop, user, board):
         other = await create_board(db_session, "Other", actor=sysop)
@@ -285,9 +283,7 @@ class TestPostMessage:
         parent = await post_message(db_session, other.id, "Sub", "Body", sysop)
         await db_session.commit()
         with pytest.raises(MessageNotFound):
-            await post_message(
-                db_session, board.id, "Re", "Reply", user, reply_to_id=parent.id
-            )
+            await post_message(db_session, board.id, "Re", "Reply", user, reply_to_id=parent.id)
 
 
 # ── list_thread_starters ──────────────────────────────────────────────────────
@@ -297,9 +293,7 @@ class TestListThreadStarters:
     async def test_returns_top_level_only(self, db_session, user, board):
         parent = await post_message(db_session, board.id, "Root", "Body", user)
         await db_session.commit()
-        await post_message(
-            db_session, board.id, "Reply", "Body", user, reply_to_id=parent.id
-        )
+        await post_message(db_session, board.id, "Reply", "Body", user, reply_to_id=parent.id)
         await db_session.commit()
 
         threads = await list_thread_starters(db_session, board.id, user)
@@ -339,12 +333,8 @@ class TestGetThread:
     async def test_returns_root_and_replies(self, db_session, user, board):
         root = await post_message(db_session, board.id, "Root", "Body", user)
         await db_session.commit()
-        r1 = await post_message(
-            db_session, board.id, "R1", "Body", user, reply_to_id=root.id
-        )
-        r2 = await post_message(
-            db_session, board.id, "R2", "Body", user, reply_to_id=root.id
-        )
+        r1 = await post_message(db_session, board.id, "R1", "Body", user, reply_to_id=root.id)
+        r2 = await post_message(db_session, board.id, "R2", "Body", user, reply_to_id=root.id)
         await db_session.commit()
 
         fetched_root, replies = await get_thread(db_session, root.id, user)
@@ -364,9 +354,7 @@ class TestGetThread:
     async def test_deleted_replies_excluded(self, db_session, user, board):
         root = await post_message(db_session, board.id, "Root", "Body", user)
         await db_session.commit()
-        reply = await post_message(
-            db_session, board.id, "Reply", "Body", user, reply_to_id=root.id
-        )
+        reply = await post_message(db_session, board.id, "Reply", "Body", user, reply_to_id=root.id)
         await db_session.commit()
         reply.is_deleted = True
         await db_session.commit()
@@ -481,6 +469,7 @@ class TestMessageCount:
 
 
 # ── Helper fixture for a second regular user ─────────────────────────────────
+
 
 @pytest.fixture
 async def db_session_user2(db_session, sysop):

@@ -508,9 +508,7 @@ def _piped_transports():
 
 
 class TestXyzmodemTransfers:
-    async def test_send_and_receive_zmodem(
-        self, db_session, sysop, area, tmp_path, monkeypatch
-    ):
+    async def test_send_and_receive_zmodem(self, db_session, sysop, area, tmp_path, monkeypatch):
         monkeypatch.setattr("yesterwind_bbs.files.config.FILES_DIR", str(tmp_path))
 
         from yesterwind_xyzmodem import ZModem
@@ -543,6 +541,4 @@ class TestXyzmodemTransfers:
     async def test_send_missing_file_raises(self, db_session, sysop, area):
         with pytest.raises(FileNotFound):
             # Error fires before any I/O — safe to pass None for streams
-            await send_file_xyzmodem(
-                db_session, 9999, sysop, None, None, protocol="zmodem"
-            )
+            await send_file_xyzmodem(db_session, 9999, sysop, None, None, protocol="zmodem")

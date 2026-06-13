@@ -71,9 +71,7 @@ async def get_board(
         BoardNotFound   — board doesn't exist or is inactive
         PermissionDenied — actor is below read_level
     """
-    result = await session.execute(
-        select(MessageBoard).where(MessageBoard.id == board_id)
-    )
+    result = await session.execute(select(MessageBoard).where(MessageBoard.id == board_id))
     board = result.scalar_one_or_none()
     if board is None or not board.is_active:
         raise BoardNotFound(f"Board {board_id} not found.")
@@ -144,9 +142,7 @@ async def update_board(
     if not actor.is_sysop:
         raise PermissionDenied("Only sysops can update boards.")
 
-    result = await session.execute(
-        select(MessageBoard).where(MessageBoard.id == board_id)
-    )
+    result = await session.execute(select(MessageBoard).where(MessageBoard.id == board_id))
     board = result.scalar_one_or_none()
     if board is None:
         raise BoardNotFound(f"Board {board_id} not found.")
@@ -226,9 +222,7 @@ async def get_thread(
         BoardNotFound    — board is inactive
         PermissionDenied — actor below board's read_level
     """
-    result = await session.execute(
-        select(Message).where(Message.id == message_id)
-    )
+    result = await session.execute(select(Message).where(Message.id == message_id))
     root = result.scalar_one_or_none()
     if root is None or root.is_deleted:
         raise MessageNotFound(f"Message {message_id} not found.")
@@ -278,9 +272,7 @@ async def post_message(
         raise ValueError("Body must not be empty.")
 
     if reply_to_id is not None:
-        result = await session.execute(
-            select(Message).where(Message.id == reply_to_id)
-        )
+        result = await session.execute(select(Message).where(Message.id == reply_to_id))
         parent = result.scalar_one_or_none()
         if parent is None or parent.is_deleted:
             raise MessageNotFound(f"Message {reply_to_id} not found.")
@@ -317,9 +309,7 @@ async def edit_message(
         MessageNotFound  — message not found or deleted
         PermissionDenied — actor is neither the author nor a sysop
     """
-    result = await session.execute(
-        select(Message).where(Message.id == message_id)
-    )
+    result = await session.execute(select(Message).where(Message.id == message_id))
     msg = result.scalar_one_or_none()
     if msg is None or msg.is_deleted:
         raise MessageNotFound(f"Message {message_id} not found.")
@@ -349,9 +339,7 @@ async def delete_message(
         MessageNotFound  — message not found or already deleted
         PermissionDenied — actor is neither the author nor a sysop
     """
-    result = await session.execute(
-        select(Message).where(Message.id == message_id)
-    )
+    result = await session.execute(select(Message).where(Message.id == message_id))
     msg = result.scalar_one_or_none()
     if msg is None or msg.is_deleted:
         raise MessageNotFound(f"Message {message_id} not found.")
@@ -377,7 +365,5 @@ async def message_count(
     conditions = [Message.board_id == board_id]
     if not include_deleted:
         conditions.append(Message.is_deleted == False)  # noqa: E712
-    result = await session.execute(
-        select(func.count()).select_from(Message).where(*conditions)
-    )
+    result = await session.execute(select(func.count()).select_from(Message).where(*conditions))
     return result.scalar_one()
