@@ -343,3 +343,30 @@ class TestInitDb:
         from yesterwind_bbs.db.engine import init_db
 
         await init_db()  # should not raise
+
+    async def test_init_db_creates_sqlite_directory(self, tmp_path):
+        """init_db auto-creates the parent directory for a file-backed SQLite DB."""
+        import sys
+        from unittest.mock import patch
+
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        db_dir = tmp_path / "nested" / "subdir"
+        db_path = db_dir / "bbs.db"
+        url = f"sqlite+aiosqlite:///{db_path}"
+
+        assert not db_dir.exists()
+
+        # Access the actual module (not the re-exported engine object from db/__init__)
+        engine_module = sys.modules["yesterwind_bbs.db.engine"]
+        new_engine = create_async_engine(url, connect_args={"check_same_thread": False})
+        try:
+            with (
+                patch.object(engine_module.config, "DATABASE_URL", url),
+                patch.object(engine_module, "engine", new_engine),
+            ):
+                await engine_module.init_db()
+        finally:
+            await new_engine.dispose()
+
+        assert db_dir.exists()

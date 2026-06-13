@@ -685,15 +685,71 @@ async def _main_menu(actor: User) -> None:
             return
 
 
+# ── First-run setup ───────────────────────────────────────────────────────────
+
+
+async def _is_first_run() -> bool:
+    from sqlalchemy import func, select
+
+    async with get_session() as session:
+        result = await session.execute(select(func.count()).select_from(User))
+        return (result.scalar() or 0) == 0
+
+
+async def _first_run_setup() -> User:
+    """Interactive wizard that creates the initial sysop account."""
+    console.print(
+        Panel(
+            "[bold yellow]Welcome to Yesterwind BBS![/]\n\n"
+            "No accounts exist yet. Let's create the first sysop account.",
+            title="First-run setup",
+            expand=False,
+        )
+    )
+    while True:
+        username = Prompt.ask("[bold]Sysop username[/]").strip()
+        if not username:
+            _error("Username cannot be empty.")
+            continue
+        password = Prompt.ask("[bold]Password[/]", password=True)
+        try:
+            validate_password(password)
+        except Exception as exc:
+            _error(str(exc))
+            continue
+        confirm = Prompt.ask("[bold]Confirm password[/]", password=True)
+        if password != confirm:
+            _error("Passwords do not match.")
+            continue
+        break
+
+    pw_hash = hash_password(password)
+    async with get_session() as session:
+        user = User(
+            username=username,
+            password_hash=pw_hash,
+            access_level=AccessLevel.SYSOP,
+        )
+        session.add(user)
+        await session.flush()
+        await session.refresh(user)
+
+    _success(f"Sysop account [bold]{username}[/] created. Welcome!")
+    return user
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 
 async def _run() -> None:
     await init_db()
-    actor = await _authenticate()
-    if actor is None:
-        _error("Authentication failed. Exiting.")
-        sys.exit(1)
+    if await _is_first_run():
+        actor = await _first_run_setup()
+    else:
+        actor = await _authenticate()
+        if actor is None:
+            _error("Authentication failed. Exiting.")
+            sys.exit(1)
     _success(f"Logged in as [bold]{actor.username}[/] (level {actor.access_level})")
     await _main_menu(actor)
 

@@ -179,6 +179,49 @@ class TestPetsciiTerminal:
     def test_decode_key_delete(self):
         assert self.t.decode_key(b"\x14") == "BACKSPACE"
 
+    def test_encode_carriage_return_ignored(self):
+        assert self.t.encode("\r") == b""
+
+    def test_encode_punctuation_passthrough(self):
+        result = self.t.encode(" !")  # 0x20 and 0x21 both in range
+        assert result == b" !"
+
+    def test_encode_unknown_char_becomes_question_mark(self):
+        result = self.t.encode("\x80")
+        assert result == b"?"
+
+    def test_set_color_known(self):
+        result = self.t.set_color(fg=0)  # black
+        assert isinstance(result, bytes)
+
+    def test_set_color_unknown(self):
+        assert self.t.set_color(fg=99) == b""
+
+    def test_reset_color(self):
+        assert isinstance(self.t.reset_color(), bytes)
+
+    def test_write_appends_return(self):
+        result = self.t.write("HI")
+        assert result.endswith(b"\x0d")
+
+    def test_decode_key_cursor_up(self):
+        assert self.t.decode_key(b"\x91") == "UP"
+
+    def test_decode_key_cursor_down(self):
+        assert self.t.decode_key(b"\x11") == "DOWN"
+
+    def test_decode_key_cursor_left(self):
+        assert self.t.decode_key(b"\x9d") == "LEFT"
+
+    def test_decode_key_cursor_right(self):
+        assert self.t.decode_key(b"\x1d") == "RIGHT"
+
+    def test_decode_key_printable(self):
+        assert self.t.decode_key(b"A") == "A"
+
+    def test_decode_key_unknown(self):
+        assert self.t.decode_key(b"\x01") == ""
+
 
 # ── ASCII terminal ────────────────────────────────────────────────────────────
 
@@ -210,3 +253,83 @@ class TestAsciiTerminal:
 
     def test_decode_key_backspace(self):
         assert self.t.decode_key(b"\x7f") == "BACKSPACE"
+
+
+class TestTerminalPackageImports:
+    def test_package_exports(self):
+        from yesterwind_bbs.terminal import (
+            AnsiTerminal,
+            AsciiTerminal,
+            AtasciiTerminal,
+            PetsciiTerminal,
+            Terminal,
+            TerminalType,
+        )
+
+        assert issubclass(AnsiTerminal, Terminal)
+        assert issubclass(AsciiTerminal, Terminal)
+        assert issubclass(AtasciiTerminal, Terminal)
+        assert issubclass(PetsciiTerminal, Terminal)
+        assert TerminalType.ANSI is not None
+
+
+class TestCliMain:
+    def test_main_calls_asyncio_run(self):
+        from unittest.mock import patch
+
+        with patch("yesterwind_bbs.cli.asyncio.run") as mock_run:
+            from yesterwind_bbs.cli import main
+
+            main()
+            mock_run.assert_called_once()
+
+
+class TestServe:
+    async def test_serve_starts_and_shuts_down(self):
+        from unittest.mock import AsyncMock, patch
+
+        mock_server = AsyncMock()
+        mock_server.sockets = []
+        mock_server.__aenter__ = AsyncMock(return_value=mock_server)
+        mock_server.__aexit__ = AsyncMock(return_value=None)
+
+        async def fake_start_serving():
+            pass
+
+        mock_server.start_serving = fake_start_serving
+
+        # Resolve stop future immediately after it's created
+        _real_loop = None
+
+        async def patched_serve():
+            # Patch stop future to resolve immediately
+            import asyncio as _asyncio
+
+            from yesterwind_bbs.server import serve as _serve
+
+            orig_get_running_loop = _asyncio.get_running_loop
+
+            class _FakeLoop:
+                def __init__(self, real):
+                    self._real = real
+
+                def create_future(self):
+                    f = self._real.create_future()
+                    f.set_result(None)  # resolve immediately
+                    return f
+
+                def add_signal_handler(self, *args, **kwargs):
+                    pass  # no-op
+
+            loop_patch = patch(
+                "yesterwind_bbs.server.asyncio.get_running_loop",
+                return_value=_FakeLoop(orig_get_running_loop()),
+            )
+            with loop_patch:
+                await _serve()
+
+        with (
+            patch("yesterwind_bbs.server.init_db", new_callable=AsyncMock),
+            patch("yesterwind_bbs.server.asyncio.start_server", return_value=mock_server),
+        ):
+            await patched_serve()
