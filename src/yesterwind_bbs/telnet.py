@@ -50,7 +50,10 @@ async def passive_detect(
     except asyncio.TimeoutError:
         return None
 
-    if not first or first[0] != IAC:
+    if not first:
+        # EOF before any data (e.g. healthcheck that connects and immediately closes)
+        return None
+    if first[0] != IAC:
         # Client sent non-IAC data (e.g. an immediate keypress) — put it back
         reader.feed_data(first)
         return None
