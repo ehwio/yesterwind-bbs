@@ -118,6 +118,15 @@ class _Conn:
                 raise ConnectionResetError("Client disconnected")
             key = self.term.decode_key(raw)
             if key == "ENTER":
+                # Absorb the trailing \n from a CRLF sequence so the next
+                # read_line call doesn't see a spurious empty ENTER.
+                if raw == b"\r":
+                    try:
+                        lf = await asyncio.wait_for(self.reader.read(1), timeout=0.05)
+                        if lf and lf != b"\n":
+                            self.reader.feed_data(lf)
+                    except asyncio.TimeoutError:
+                        pass
                 await self.sendline()
                 return "".join(buf).strip()
             elif key == "BACKSPACE":
