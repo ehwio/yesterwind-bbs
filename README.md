@@ -6,11 +6,19 @@ A retro-style telnet BBS server with support for ANSI/VT100, ATASCII (Atari 8-bi
 
 ```bash
 cp .env.example .env
-# Edit .env — set BBS_NAME, SYSOP_PASSWORD, and generate a SECRET_KEY
+# Edit .env — at minimum generate a SECRET_KEY:
+#   python -c "import secrets; print(secrets.token_hex(32))"
 docker compose up -d
 ```
 
-Connect with:
+**First run:** no accounts exist yet. Before connecting, create the initial sysop account:
+
+```bash
+docker compose exec bbs bbs-sysop
+```
+
+Then connect with any telnet client:
+
 ```bash
 telnet localhost 23
 ```
@@ -18,7 +26,7 @@ telnet localhost 23
 ## Sysop console
 
 ```bash
-docker exec -it bbs bbs-sysop
+docker compose exec bbs bbs-sysop
 ```
 
 ## Configuration
