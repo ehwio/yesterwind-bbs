@@ -498,6 +498,93 @@ async def receive_file_xyzmodem(
     return entries
 
 
+# ── Sysop import helpers ──────────────────────────────────────────────────────
+
+
+async def register_existing_file(
+    session: AsyncSession,
+    area_id: int,
+    disk_path: Path,
+    *,
+    description: str | None = None,
+) -> FileEntry:
+    """
+    Register a file that already lives on disk inside the area directory.
+
+    Unlike register_file(), the file is not copied or renamed — disk_path
+    must already be under _area_dir(area). display_name and stored_name are
+    both set to disk_path.name. uploader_id is left NULL (sysop import).
+
+    Raises:
+        AreaNotFound      — area doesn't exist or is inactive
+        DuplicateFilename — display_name already registered in this area
+    """
+    result = await session.execute(select(FileArea).where(FileArea.id == area_id))
+    area = result.scalar_one_or_none()
+    if area is None or not area.is_active:
+        raise AreaNotFound(f"File area {area_id} not found.")
+
+    display = disk_path.name
+    dup = await session.execute(
+        select(FileEntry).where(
+            FileEntry.area_id == area_id,
+            FileEntry.display_name == display,
+            FileEntry.is_active == True,  # noqa: E712
+        )
+    )
+    if dup.scalar_one_or_none() is not None:
+        raise DuplicateFilename(f"'{display}' is already registered in this area.")
+
+    data = disk_path.read_bytes()
+    entry = FileEntry(
+        area_id=area_id,
+        uploader_id=None,
+        stored_name=display,
+        display_name=display,
+        description=description,
+        size_bytes=len(data),
+        sha256=_sha256(data),
+    )
+    session.add(entry)
+    await session.flush()
+    return entry
+
+
+async def scan_area_dir(
+    session: AsyncSession,
+    area_id: int,
+) -> tuple[list[Path], list[FileEntry]]:
+    """
+    Compare the area's directory against the database.
+
+    Returns:
+        new_files    — paths on disk with no active FileEntry
+        gone_entries — active FileEntry rows whose stored_name no longer exists on disk
+    """
+    result = await session.execute(select(FileArea).where(FileArea.id == area_id))
+    area = result.scalar_one_or_none()
+    if area is None:
+        raise AreaNotFound(f"File area {area_id} not found.")
+
+    area_dir = _area_dir(area)
+    disk_files: set[str] = set()
+    if area_dir.is_dir():
+        disk_files = {p.name for p in area_dir.iterdir() if p.is_file()}
+
+    db_result = await session.execute(
+        select(FileEntry).where(
+            FileEntry.area_id == area_id,
+            FileEntry.is_active == True,  # noqa: E712
+        )
+    )
+    db_entries = list(db_result.scalars().all())
+    db_names = {e.stored_name for e in db_entries}
+
+    new_files = [area_dir / name for name in sorted(disk_files - db_names)]
+    gone_entries = [e for e in db_entries if e.stored_name not in disk_files]
+    return new_files, gone_entries
+
+
 # ── Sysop convenience ─────────────────────────────────────────────────────────
 
 
