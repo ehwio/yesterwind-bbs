@@ -31,11 +31,14 @@ from yesterwind_bbs.db.engine import get_session, init_db
 from yesterwind_bbs.db.models import AccessLevel, User
 from yesterwind_bbs.files import (
     AreaNotFound,
+    DuplicateFilename,
     FileError,
     create_area,
     file_count,
     get_area,
     list_areas,
+    register_existing_file,
+    scan_area_dir,
     update_area,
 )
 from yesterwind_bbs.messages import (
@@ -440,6 +443,8 @@ async def _areas_menu(actor: User) -> None:
         console.print("[2] Create area")
         console.print("[3] Edit area")
         console.print("[4] Toggle active")
+        console.print("[5] Import files from disk")
+        console.print("[6] Rescan area")
         console.print("[B] Back")
         choice = Prompt.ask("Choice").strip().upper()
 
@@ -451,6 +456,10 @@ async def _areas_menu(actor: User) -> None:
             await _edit_area(actor)
         elif choice == "4":
             await _toggle_area(actor)
+        elif choice == "5":
+            await _import_files(actor)
+        elif choice == "6":
+            await _rescan_area(actor)
         elif choice == "B":
             return
 
@@ -566,6 +575,87 @@ async def _toggle_area(actor: User) -> None:
         _success(f"Area '{area.name}' {action}d.")
     except FileError as exc:
         _error(str(exc))
+
+
+async def _import_files(actor: User) -> None:
+    """Register all untracked files in an area's directory."""
+    area_id = IntPrompt.ask("Area ID")
+    try:
+        async with get_session() as session:
+            new_files, _ = await scan_area_dir(session, area_id)
+    except AreaNotFound as exc:
+        _error(str(exc))
+        return
+
+    if not new_files:
+        _warn("No new files found on disk.")
+        return
+
+    console.print(f"Found [bold]{len(new_files)}[/] unregistered file(s):")
+    for p in new_files:
+        console.print(f"  {p.name}")
+
+    if not Confirm.ask("Register all?"):
+        _warn("Cancelled.")
+        return
+
+    imported = 0
+    for p in new_files:
+        try:
+            async with get_session() as session:
+                await register_existing_file(session, area_id, p)
+            imported += 1
+        except DuplicateFilename:
+            _warn(f"Skipped '{p.name}' (already registered).")
+        except Exception as exc:  # noqa: BLE001
+            _error(f"Failed to import '{p.name}': {exc}")
+
+    _success(f"Imported {imported} of {len(new_files)} file(s).")
+
+
+async def _rescan_area(actor: User) -> None:
+    """Add new files and report (or remove) entries for deleted files."""
+    area_id = IntPrompt.ask("Area ID")
+    try:
+        async with get_session() as session:
+            new_files, gone_entries = await scan_area_dir(session, area_id)
+    except AreaNotFound as exc:
+        _error(str(exc))
+        return
+
+    if not new_files and not gone_entries:
+        _success("Area is up to date — nothing to do.")
+        return
+
+    if new_files:
+        console.print(f"\n[bold cyan]{len(new_files)} new file(s) on disk:[/]")
+        for p in new_files:
+            console.print(f"  + {p.name}")
+        if Confirm.ask("Register new files?"):
+            imported = 0
+            for p in new_files:
+                try:
+                    async with get_session() as session:
+                        await register_existing_file(session, area_id, p)
+                    imported += 1
+                except DuplicateFilename:
+                    _warn(f"Skipped '{p.name}' (already registered).")
+                except Exception as exc:  # noqa: BLE001
+                    _error(f"Failed '{p.name}': {exc}")
+            _success(f"Registered {imported} new file(s).")
+
+    if gone_entries:
+        console.print(
+            f"\n[bold yellow]{len(gone_entries)} registered file(s) missing from disk:[/]"
+        )  # noqa: E501
+        for e in gone_entries:
+            console.print(f"  - {e.display_name}")
+        if Confirm.ask("Deactivate missing entries?"):
+            async with get_session() as session:
+                for e in gone_entries:
+                    e.is_active = False
+                    session.add(e)
+            _success(f"Deactivated {len(gone_entries)} missing entry/entries.")
 
 
 # ── Status panel ──────────────────────────────────────────────────────────────
