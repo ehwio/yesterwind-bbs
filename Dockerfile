@@ -19,6 +19,10 @@ COPY src/ ./src/
 # Install the project itself (fast — deps are already in the layer above)
 RUN uv sync --frozen --no-dev --extra postgres
 
+# Pre-create data directories owned by bbs so the named volume is
+# initialised with the right permissions on first docker compose up
+RUN mkdir -p /app/data/files && chown -R bbs:bbs /app/data
+
 # Runtime data lives in a mounted volume — never baked into the image
 VOLUME ["/app/data"]
 
