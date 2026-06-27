@@ -168,7 +168,7 @@ class _Conn:
 
 async def _show_splash(conn: _Conn) -> None:
     conn.writer.write(b"\x1b[2J\x1b[H")  # clear screen
-    if conn.terminal.terminal_type == TerminalType.ANSI:
+    if conn.term.terminal_type == TerminalType.ANSI:
         conn.writer.write(ansi_splash())
         await conn.writer.drain()
         await asyncio.wait_for(conn.reader.read(1), timeout=300)
@@ -749,6 +749,17 @@ async def handle_session(
 
         session_id = await _create_session_row(addr, terminal.terminal_type.value)
         conn = _Conn(reader, writer, terminal)
+
+        # Tell the client: server will echo, suppress go-ahead (character mode).
+        # This disables local echo on the client side, which is essential for
+        # char-by-char input and hidden password entry.  Old 8-bit clients that
+        # don't understand these options will ignore the IAC sequences.
+        writer.write(
+            telnet.build_will(telnet.OPT_ECHO)
+            + telnet.build_will(telnet.OPT_SGA)
+            + telnet.build_do(telnet.OPT_SGA)
+        )
+        await writer.drain()
 
         await _show_splash(conn)
         await conn.sendline("Type NEW to create an account.")
