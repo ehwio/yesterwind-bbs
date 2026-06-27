@@ -58,6 +58,7 @@ from yesterwind_bbs.messages import (
 from yesterwind_bbs.messages import (
     PermissionDenied as MsgPermissionDenied,
 )
+from yesterwind_bbs.splash import ansi_splash, plain_splash
 from yesterwind_bbs.terminal.ansi import AnsiTerminal
 from yesterwind_bbs.terminal.ascii import AsciiTerminal
 from yesterwind_bbs.terminal.atascii import AtasciiTerminal
@@ -160,6 +161,19 @@ class _Conn:
         await self.sendline(f"  {config.BBS_NAME}")
         await self.sendline(f"  Sysop: {config.BBS_SYSOP}")
         await self.hr()
+
+
+# ── Splash screen ────────────────────────────────────────────────────────────
+
+
+async def _show_splash(conn: _Conn) -> None:
+    conn.writer.write(b"\x1b[2J\x1b[H")  # clear screen
+    if conn.terminal.terminal_type == TerminalType.ANSI:
+        conn.writer.write(ansi_splash())
+    else:
+        conn.writer.write(plain_splash())
+        await conn.banner()
+    await conn.writer.drain()
 
 
 # ── Session row tracking ──────────────────────────────────────────────────────
@@ -735,7 +749,7 @@ async def handle_session(
         session_id = await _create_session_row(addr, terminal.terminal_type.value)
         conn = _Conn(reader, writer, terminal)
 
-        await conn.banner()
+        await _show_splash(conn)
         await conn.sendline("Type NEW to create an account.")
 
         user = await _login_screen(conn)
