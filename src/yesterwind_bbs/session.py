@@ -170,10 +170,11 @@ async def _show_splash(conn: _Conn) -> None:
     conn.writer.write(b"\x1b[2J\x1b[H")  # clear screen
     if conn.terminal.terminal_type == TerminalType.ANSI:
         conn.writer.write(ansi_splash())
+        await conn.writer.drain()
+        await asyncio.wait_for(conn.reader.read(1), timeout=300)
     else:
         conn.writer.write(plain_splash())
-        await conn.banner()
-    await conn.writer.drain()
+        await conn.writer.drain()
 
 
 # ── Session row tracking ──────────────────────────────────────────────────────
