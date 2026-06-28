@@ -58,6 +58,7 @@ from yesterwind_bbs.messages import (
 from yesterwind_bbs.messages import (
     PermissionDenied as MsgPermissionDenied,
 )
+from yesterwind_bbs.splash import ansi_splash, plain_splash
 from yesterwind_bbs.terminal.ansi import AnsiTerminal
 from yesterwind_bbs.terminal.ascii import AsciiTerminal
 from yesterwind_bbs.terminal.atascii import AtasciiTerminal
@@ -162,6 +163,31 @@ class _Conn:
         await self.hr()
 
 
+# ── Splash screen ────────────────────────────────────────────────────────────
+
+
+async def _show_splash(conn: _Conn) -> None:
+    conn.writer.write(b"\x1b[2J\x1b[H")  # clear screen
+    if conn.term.terminal_type == TerminalType.ANSI:
+        conn.writer.write(ansi_splash())
+        await conn.writer.drain()
+        # Wait for a real keypress. The client sends IAC negotiation responses
+        # (DO ECHO, DO SGA, WILL SGA) immediately after we send our options;
+        # those 0xFF bytes must be skipped or they dismiss the splash instantly.
+        while True:
+            b = await asyncio.wait_for(conn.reader.read(1), timeout=300)
+            if not b:
+                raise ConnectionResetError("Client disconnected")
+            if b[0] == telnet.IAC:
+                # Skip the 2-byte option code that follows every IAC command
+                await asyncio.wait_for(conn.reader.read(2), timeout=5)
+                continue
+            break
+    else:
+        conn.writer.write(plain_splash())
+        await conn.writer.drain()
+
+
 # ── Session row tracking ──────────────────────────────────────────────────────
 
 
@@ -234,6 +260,16 @@ async def _negotiate_terminal(
         choice = data.decode("ascii", errors="replace").strip()
         term_type = TerminalType.from_choice(choice)
         if term_type:
+            # Drain any trailing CR/LF the client sent with the menu choice
+            # (line-mode clients send "1\r\n"; we read '1' above and must
+            # discard the rest or it satisfies the next read() immediately).
+            try:
+                leftover = await asyncio.wait_for(reader.read(2), timeout=0.1)
+                for b in leftover:
+                    if b not in (0x0D, 0x0A):
+                        reader.feed_data(bytes([b]))
+            except asyncio.TimeoutError:
+                pass
             return _TERMINAL_MAP[term_type]()
 
         writer.write(b"Invalid choice. Enter 1, 2, 3, or 4: ")
@@ -735,7 +771,25 @@ async def handle_session(
         session_id = await _create_session_row(addr, terminal.terminal_type.value)
         conn = _Conn(reader, writer, terminal)
 
-        await conn.banner()
+        # Tell the client: server will echo, suppress go-ahead (character mode).
+        # This disables local echo on the client side, which is essential for
+        # char-by-char input and hidden password entry.  Old 8-bit clients that
+        # don't understand these options will ignore the IAC sequences.
+        writer.write(
+            telnet.build_will(telnet.OPT_ECHO)
+            + telnet.build_will(telnet.OPT_SGA)
+            + telnet.build_do(telnet.OPT_SGA)
+        )
+        await writer.drain()
+        # Give the client a moment to process the IAC options before we start
+        # reading input, so echo-suppression is in effect before the first prompt.
+        await asyncio.sleep(0.15)
+
+        await _show_splash(conn)
+        # Clear screen so login prompt appears on a fresh screen, not below the splash.
+        if conn.term.terminal_type == TerminalType.ANSI:
+            conn.writer.write(b"\x1b[2J\x1b[H")
+            await conn.writer.drain()
         await conn.sendline("Type NEW to create an account.")
 
         user = await _login_screen(conn)
