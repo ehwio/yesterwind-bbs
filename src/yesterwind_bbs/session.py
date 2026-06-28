@@ -171,7 +171,18 @@ async def _show_splash(conn: _Conn) -> None:
     if conn.term.terminal_type == TerminalType.ANSI:
         conn.writer.write(ansi_splash())
         await conn.writer.drain()
-        await asyncio.wait_for(conn.reader.read(1), timeout=300)
+        # Wait for a real keypress. The client sends IAC negotiation responses
+        # (DO ECHO, DO SGA, WILL SGA) immediately after we send our options;
+        # those 0xFF bytes must be skipped or they dismiss the splash instantly.
+        while True:
+            b = await asyncio.wait_for(conn.reader.read(1), timeout=300)
+            if not b:
+                raise ConnectionResetError("Client disconnected")
+            if b[0] == telnet.IAC:
+                # Skip the 2-byte option code that follows every IAC command
+                await asyncio.wait_for(conn.reader.read(2), timeout=5)
+                continue
+            break
     else:
         conn.writer.write(plain_splash())
         await conn.writer.drain()
